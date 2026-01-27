@@ -1,0 +1,1 @@
+export { AudienceFatigueDetailPanel } from './AudienceFatigueDetailPanel';

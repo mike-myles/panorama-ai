@@ -1,0 +1,16 @@
+{
+  "campaignStatuses": {
+    "camp-1": "active",
+    "camp-2": "active",
+    "camp-3": "at_risk",
+    "camp-4": "paused",
+    "camp-5": "active",
+    "camp-6": "active",
+    "camp-7": "at_risk",
+    "camp-8": "active",
+    "camp-9": "active",
+    "camp-10": "paused"
+  }
+}
+
+

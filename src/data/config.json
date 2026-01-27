@@ -1,0 +1,8 @@
+{
+  "budgetMin": 2000,
+  "budgetMax": 500000,
+  "nodeSize": {
+    "min": 0.6,
+    "max": 2.8
+  }
+}
