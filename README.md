@@ -1,6 +1,8 @@
-# Layered Intelligence Stack - Interactive Marketing Dashboard
+# Interactive Orbital Data Visualization
 
 A revolutionary "Z-Axis Data Archaeology" interface for marketing operations with semantic zooming and depth-of-field effects.
+
+GitHub Pages demo at - https://mike-myles.github.io/panorama-ai/
 
 ## Features
 
