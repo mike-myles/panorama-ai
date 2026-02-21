@@ -203,15 +203,10 @@ export const PresetTabs: React.FC = () => {
             gap: 32,
           }}
         >
-          {/* LEFT: Adobe Logo + title */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-            <img 
-              src="/assets/adobe-logo.svg" 
-              alt="Adobe" 
-              style={{ height: '30px', width: 'auto', objectFit: 'contain' }}
-            />
+          {/* LEFT: Title */}
+          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
             <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.95)' }}>
-              Adobe Panorama
+              Panorama
             </span>
           </div>
 
