@@ -1,19 +1,26 @@
-# Layered Intelligence Stack - Interactive Marketing Dashboard
+# Panorama
 
-A revolutionary "Z-Axis Data Archaeology" interface for marketing operations with semantic zooming and depth-of-field effects.
+A 3D data visualization pattern for **hierarchical and connected data**: entities as nodes on orbital rings, with layout dimensions (e.g. lifecycle, time, category) mapped to rings and node size. Navigate, filter, and drill into nodes in an interactive “cosmos” view. The included demo uses campaign-style datasets to illustrate the pattern; the approach generalizes to other domain models.
+
+**Live app:** [https://mike-myles.github.io/panorama-ai/](https://mike-myles.github.io/panorama-ai/)
+
+---
 
 ## Features
 
-- **5-Layer System**: Navigate from portfolio overview to granular diagnostics
-- **Semantic Zoom**: Natural "digging" metaphor with Ctrl/Cmd + scroll
-- **Depth-of-Field Effects**: Parallax scrolling and progressive blur
-- **Real-time Alerts**: Heat signatures with drill-down navigation
-- **AI Recommendations**: Smart suggestions with confidence scores
-- **Quick Actions**: One-click issue resolution with undo/redo
-- **Advanced Filtering**: Multi-dimensional campaign filtering
-- **Comparison Mode**: Side-by-side performance analysis
+- **Orbital 3D layout** – Nodes arranged on rings; ring position and node size encode dimensions (e.g. time, stage, magnitude). Orbit controls, zoom, and camera presets.
+- **Multiple data sources & layouts** – Switch between datasets via the Database icon. Example: **Mock data** (hierarchy + lifecycle/funnel/readiness) and **GMO** (time-based: 6 rings by end date, size by duration); legend and filters adapt to the active schema.
+- **Hierarchy & presets** – Preset tabs (e.g. Portfolio, Channels, Campaigns, Issues, Opportunities) for high-level navigation; filter panel and legend toggles for dimensions and subsets.
+- **Node detail & relations** – Click a node to open a detail panel; optional orbit view for related nodes. Hover highlight; optional labels on nodes.
+- **Panels & controls** – Alerts, launch-readiness, and timeline-style controls in the demo; (in dev) optional AI intent search via header prompt.
+
+---
 
 ## Getting Started
+
+### Prerequisites
+
+- Node.js 20+ and npm
 
 ### Installation
 
@@ -27,7 +34,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the dashboard.
+Open [http://localhost:3000](http://localhost:3000). The AI header search calls `/api/intent`, which is only available when a matching backend is run locally; the rest of the app works without it.
 
 ### Build
 
@@ -35,94 +42,99 @@ Open [http://localhost:3000](http://localhost:3000) to view the dashboard.
 npm run build
 ```
 
+Output is in `dist/`. For GitHub Pages deployment, the build uses `VITE_APP_BASE="/panorama-ai/"` (see `.github/workflows/deploy-pages.yml`).
+
+### Preview production build
+
+```bash
+npm run preview
+```
+
+---
+
 ## Usage
 
-### Navigation
+### Data source
 
-- **Zoom In/Out**: Hold `Ctrl` (Windows) or `Cmd` (Mac) and scroll
-- **Layer Navigation**: Click on cards to dive deeper into data
-- **Preset Views**: Use top tabs to jump to specific dashboards
-- **Breadcrumbs**: Click breadcrumb navigation to move up layers
+- Click the **Database** icon to switch between datasets. Each source can use a different layout (e.g. rings by lifecycle vs. rings by end date); the legend and filters update to match the active schema.
 
-### Layers
+### Cosmos
 
-- **Layer 0 (0-20%)**: Portfolio Surface - KPI overview
-- **Layer 1 (20-40%)**: Strategic Channel View - Channel performance
-- **Layer 2 (40-60%)**: Tactical Campaign Grid - Campaign cards
-- **Layer 3 (60-80%)**: Diagnostic Deep Dive - Charts and anomalies
-- **Layer 4 (80-100%)**: Granular Analytics - Detailed tables
+- **Orbit / pan / zoom:** Use the 3D controls (mouse or touch) to rotate, pan, and zoom.
+- **Reset view:** Use the reset control to return to the default camera.
+- **Legend:** Toggles show/hide dimensions and subsets; labels and counts reflect the current data source and layout.
 
-### Filtering
+### Nodes
 
-1. Click **Filters** button to expand filter options
-2. Select channels, date ranges, performance tiers, and status
-3. Active filters appear as removable chips
-4. Click **Clear All** to reset filters
+- **Click a node** to open the detail panel for that entity.
+- **Hover** to highlight; optional toggle to show names on nodes.
 
-### Comparison Mode
+### Presets and filters
 
-1. Click **Compare** button in filter bar
-2. Screen splits with independent zoom controls
-3. Navigate each pane separately
-4. Click **Exit Compare** to return
+- Use the top **Preset tabs** to switch context. Open the **Filter** panel to refine by dimensions (e.g. category, date range, status); the **legend** provides additional visibility toggles.
 
-### Quick Actions
+---
 
-1. Click on alert badges to open Quick Actions Panel
-2. Review suggested actions with confidence scores
-3. Click action to see confirmation modal
-4. Use Undo/Redo to reverse actions
-
-## Technology Stack
-
-- **React 18** with TypeScript
-- **Vite** for fast builds
-- **Framer Motion** for animations
-- **Recharts** for data visualization
-- **Tailwind CSS** for styling
-- **Lucide React** for icons
-
-## Architecture
+## Project structure
 
 ```
 src/
 ├── components/
-│   ├── layers/           # Layer-specific components
-│   ├── AlertBadge.tsx    # Alert system
-│   ├── Dashboard.tsx     # Main container
-│   ├── FilterBar.tsx     # Filtering UI
-│   ├── PresetTabs.tsx    # Top navigation
-│   ├── QuickActionsPanel.tsx
-│   └── ZoomControls.tsx
+│   ├── Dashboard.tsx          # Layout: PresetTabs + CosmosView
+│   ├── PresetTabs.tsx         # Header, preset tabs, data-source picker, search
+│   ├── CosmosView.tsx         # 3D canvas, camera, panels, legend
+│   ├── cosmos/                # Orbital viz: nodes, rings, legend, filters, detail
+│   │   ├── CampaignNodes.tsx  # Node layout (supports multiple schemas)
+│   │   ├── OrbitalRingSystem.tsx
+│   │   ├── CosmosLegend.tsx
+│   │   ├── CosmosFilterPanel.tsx
+│   │   ├── CosmosDetailPanel.tsx
+│   │   └── ...
+│   ├── TimelineSlider.tsx
+│   └── EditBudgetModal.tsx
 ├── context/
-│   └── DashboardContext.tsx  # State management
-├── data/
-│   └── mockData.ts       # Sample data
+│   └── DashboardContext.tsx   # Data source, zoom, filters, presets
+├── data/                      # Example datasets & transforms (demo uses campaign-shaped data)
+│   ├── mockData3.ts
+│   ├── gmoCampaigns.ts        # Transform external JSON → shared node shape
+│   ├── api.campaigns.cleaned.json
+│   └── ...
 ├── types/
-│   └── index.ts          # TypeScript definitions
+│   └── index.ts
 └── utils/
-    └── helpers.ts        # Utility functions
+    ├── helpers.ts
+    └── alertCalculations.ts
 ```
 
-## Performance Optimization
+---
 
-- Virtualized rendering for large datasets
-- Debounced zoom calculations (60fps)
-- Memoized expensive calculations
-- Progressive data loading
-- CSS-based blur effects for GPU acceleration
+## Technology stack
 
-## Browser Support
+- **React 18** + **TypeScript**
+- **Vite** – build and dev server
+- **Three.js** – **@react-three/fiber**, **@react-three/drei** for 3D cosmos
+- **Framer Motion**, **GSAP** – UI and camera animations
+- **Recharts** – 2D charts where used
+- **Tailwind CSS** – styling
+- **Lucide React** – icons
+- **d3**, **date-fns** – layout and date handling
 
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (latest)
+---
+
+## Deployment (GitHub Pages)
+
+- The repo is set up to deploy from **GitHub Actions** (Source: **GitHub Actions** in Settings → Pages).
+- Workflow: `.github/workflows/deploy-pages.yml` – on push to `main`, runs `npm ci`, builds with `VITE_APP_BASE="/panorama-ai/"`, uploads artifact, and deploys to GitHub Pages.
+- Live URL: [https://mike-myles.github.io/panorama-ai/](https://mike-myles.github.io/panorama-ai/).
+
+---
+
+## Browser support
+
+- Modern evergreen browsers (Chrome, Edge, Firefox, Safari). WebGL required for the 3D view.
+
+---
 
 ## License
 
 MIT
-
-## Credits
-
-Built with ❤️ for Innovation Week @ Catalyze 3D
-
