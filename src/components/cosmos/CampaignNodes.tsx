@@ -79,9 +79,16 @@ interface CampaignNodesProps {
   visibleFunnelStages?: Record<FunnelStage, boolean>;
   visibleReadinessStatuses?: Record<'on_track' | 'needs_attention' | 'at_risk', boolean>;
   visibleSpendSizes?: Record<'high' | 'mid' | 'low', boolean>;
-  layoutMode?: 'default' | 'launch_readiness';
+  layoutMode?: 'default' | 'launch_readiness' | 'gmo';
   // Alert filter: when set, only show campaigns in this list (and dim others)
   alertFilterCampaignIds?: string[] | null;
+}
+
+export interface GMOLayoutParams {
+  minEndTime: number;
+  maxEndTime: number;
+  minDurationDays: number;
+  maxDurationDays: number;
 }
 
 interface CampaignWithAngle extends Campaign {
@@ -102,7 +109,8 @@ interface CampaignNodeProps {
   hasSelection?: boolean;
   alertFilterActive?: boolean;
   alertsViewActive?: boolean;
-  layoutMode?: 'default' | 'launch_readiness';
+  layoutMode?: 'default' | 'launch_readiness' | 'gmo';
+  gmoLayoutParams?: GMOLayoutParams;
 }
 
 // Assign campaign to orbital ring based on CHANNEL (each orbit = one channel)
@@ -143,6 +151,8 @@ const generateRandomAngleForCampaign = (
   return randomValue * Math.PI * 2;
 };
 
+const GMO_ORBIT_RADII = [62, 80, 98, 116, 134, 152]; // 6 orbits, innermost = soonest end date
+
 const CampaignNode: React.FC<CampaignNodeProps> = React.memo(({ 
   campaign, 
   zoomLevel, 
@@ -157,7 +167,8 @@ const CampaignNode: React.FC<CampaignNodeProps> = React.memo(({
   hasSelection,
   alertFilterActive,
   alertsViewActive,
-  layoutMode = 'default'
+  layoutMode = 'default',
+  gmoLayoutParams
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const ringRef = React.useRef<THREE.Mesh>(null);
@@ -168,6 +179,10 @@ const CampaignNode: React.FC<CampaignNodeProps> = React.memo(({
   // NEW FRAMEWORK: Orbital position based on LIFECYCLE STAGE
   // Each ring represents a lifecycle stage (ideation=outermost, closing=innermost)
   const radius = React.useMemo(() => {
+    if (layoutMode === 'gmo') {
+      const orbitIndex = Math.min(5, Math.max(0, (campaign as any).__gmoOrbitIndex ?? 0));
+      return GMO_ORBIT_RADII[orbitIndex];
+    }
     if (layoutMode === 'launch_readiness') {
       const pc = Math.max(0, Math.min(100, (campaign as any).percentComplete ?? 0));
       // Snap to discrete orbit bands used by OrbitalRingSystem:
@@ -188,7 +203,9 @@ const CampaignNode: React.FC<CampaignNodeProps> = React.memo(({
 
   // NEW FRAMEWORK: Tilt based on FUNNEL STAGE
   // 90° = Awareness (TOFU), 60° = Consideration (MOFU), 30° = Conversion (BOFU), 0° = Retention
+  // GMO: flat plane (0 tilt)
   const tiltRadians = React.useMemo(() => {
+    if (layoutMode === 'gmo') return 0;
     if (layoutMode === 'launch_readiness') {
       const tld = (campaign as any).targetLaunchDate ? new Date((campaign as any).targetLaunchDate) : null;
       if (tld && !isNaN(tld.getTime())) {
@@ -245,6 +262,20 @@ const CampaignNode: React.FC<CampaignNodeProps> = React.memo(({
     }
   }, [dashboardData?.campaigns]);
   const nodeSize = React.useMemo(() => {
+    if (layoutMode === 'gmo' && gmoLayoutParams) {
+      const startDate = (campaign as any).startDate ? new Date((campaign as any).startDate) : null;
+      const endDate = campaign.endDate ? new Date(campaign.endDate) : null;
+      if (startDate && endDate && !isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+        const durationDays = (endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000);
+        const { minDurationDays, maxDurationDays } = gmoLayoutParams;
+        const span = maxDurationDays - minDurationDays;
+        const t = span > 0 ? (durationDays - minDurationDays) / span : 0.5;
+        const clamped = Math.max(0, Math.min(1, t));
+        // smallest = 1.0, largest = 4.0 (4x diameter)
+        return 1.0 + clamped * 3.0;
+      }
+      return 1.5;
+    }
     const minSize = 1.0;
     const maxSize = 5.0; // 5x largest for high spend (more dramatic difference)
     const spent = Math.max(0, Number(campaign.spent) || 0);
@@ -253,7 +284,7 @@ const CampaignNode: React.FC<CampaignNodeProps> = React.memo(({
     // Use power curve (t^0.7) to make medium spends slightly larger while keeping small ones small
     const curved = Math.pow(Math.max(0, Math.min(1, t)), 0.7);
     return minSize + curved * (maxSize - minSize);
-  }, [campaign.spent, spendRange.min, spendRange.max]);
+  }, [campaign.spent, campaign.endDate, (campaign as any).startDate, spendRange.min, spendRange.max, layoutMode, gmoLayoutParams]);
   
   // Node brightness (cached)
   const brightness = React.useMemo(() => 
@@ -693,7 +724,74 @@ export const CampaignNodes: React.FC<CampaignNodesProps> = ({
   alertFilterCampaignIds
 }) => {
   // Evenly distribute angles per channel with small deterministic jitter (prevents clustering)
+  const gmoLayoutParams = React.useMemo((): GMOLayoutParams | undefined => {
+    if (layoutMode !== 'gmo') return undefined;
+    const withDates = campaigns.filter(
+      (c) => c.endDate && ((c as any).startDate || c.createdDate)
+    );
+    if (withDates.length === 0) {
+      return { minEndTime: 0, maxEndTime: 1, minDurationDays: 0, maxDurationDays: 1 };
+    }
+    const endTimes = withDates.map((c) => new Date(c.endDate!).getTime());
+    const minEndTime = Math.min(...endTimes);
+    const maxEndTime = Math.max(...endTimes);
+    const durations = withDates.map((c) => {
+      const end = new Date(c.endDate!).getTime();
+      const start = (c as any).startDate
+        ? new Date((c as any).startDate).getTime()
+        : new Date(c.createdDate).getTime();
+      return (end - start) / (24 * 60 * 60 * 1000);
+    });
+    return {
+      minEndTime,
+      maxEndTime,
+      minDurationDays: Math.min(...durations),
+      maxDurationDays: Math.max(...durations)
+    };
+  }, [campaigns, layoutMode]);
+
   const campaignsWithAngles = React.useMemo(() => {
+    // GMO: 6 orbits by end date, angle distributed within each orbit
+    if (layoutMode === 'gmo') {
+      const clone = campaigns.map((c) => ({ ...c })) as (CampaignWithAngle & { __gmoOrbitIndex?: number })[];
+      const withEnd = clone.filter((c) => {
+        const end = c.endDate ? new Date(c.endDate).getTime() : NaN;
+        const start = (c as any).startDate
+          ? new Date((c as any).startDate).getTime()
+          : c.createdDate
+            ? new Date(c.createdDate).getTime()
+            : NaN;
+        return !isNaN(end) && !isNaN(start);
+      });
+      if (withEnd.length === 0) return [];
+      const endTimes = withEnd.map((c) => new Date(c.endDate!).getTime());
+      const minEndTime = Math.min(...endTimes);
+      const maxEndTime = Math.max(...endTimes);
+      const segmentWidth = (maxEndTime - minEndTime) / 6 || 1;
+      withEnd.forEach((c) => {
+        const endT = new Date(c.endDate!).getTime();
+        const orbitIndex = Math.min(5, Math.max(0, Math.floor((endT - minEndTime) / segmentWidth)));
+        c.__gmoOrbitIndex = orbitIndex;
+      });
+      const orbitGroups: Record<number, typeof withEnd> = {
+        0: [], 1: [], 2: [], 3: [], 4: [], 5: []
+      };
+      withEnd.forEach((c) => {
+        const idx = c.__gmoOrbitIndex ?? 0;
+        orbitGroups[idx].push(c);
+      });
+      [0, 1, 2, 3, 4, 5].forEach((key) => {
+        const arr = orbitGroups[key];
+        arr.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+        const n = arr.length;
+        const step = (Math.PI * 2) / (n || 1);
+        for (let i = 0; i < n; i++) {
+          (arr[i] as CampaignWithAngle).calculatedAngle = (i * step) % (Math.PI * 2);
+        }
+      });
+      return withEnd;
+    }
+
     // Launch readiness: distribute evenly along each percent-complete band
     if (layoutMode === 'launch_readiness') {
       const clone: CampaignWithAngle[] = campaigns.map(c => ({ ...c }));
@@ -845,7 +943,7 @@ export const CampaignNodes: React.FC<CampaignNodesProps> = ({
       });
     });
     return Object.values(ringGroups).flat();
-  }, [campaigns]);
+  }, [campaigns, layoutMode]);
   
   return (
     <group>
@@ -933,6 +1031,7 @@ export const CampaignNodes: React.FC<CampaignNodesProps> = ({
           alertFilterActive={alertFilterActive}
           alertsViewActive={alertsViewActive}
           layoutMode={layoutMode}
+          gmoLayoutParams={gmoLayoutParams}
         />
         );
       })}

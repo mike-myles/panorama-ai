@@ -2,11 +2,11 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  X, Users, Target, Sparkles, Info, LayoutDashboard, Clock, Share2
+  X, Users, Target, Sparkles, Info, Clock, Share2
 } from 'lucide-react';
 import { Campaign, CategorizedAlert } from '../../../types';
 import { useDashboard } from '../../../context/DashboardContext';
-import { AI_SOLUTIONS } from '../../dashboard/AlertDetailDashboard';
+import { AI_SOLUTIONS } from '../../../data/aiSolutions';
 import { ALERT_CATEGORY_INFO } from '../../../utils/alertCalculations';
 
 /* cspell:words ROAS roas Roas bg sev */
@@ -33,7 +33,7 @@ export const AudienceFatigueDetailPanel: React.FC<AudienceFatigueDetailPanelProp
   alert,
   campaigns
 }) => {
-  const { openAlertDetailView, setFocusedCampaign, setActiveView, setZoomLevel } = useDashboard();
+  const { setFocusedCampaign, setZoomLevel } = useDashboard();
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   React.useEffect(() => {
@@ -80,13 +80,6 @@ export const AudienceFatigueDetailPanel: React.FC<AudienceFatigueDetailPanelProp
 
     return { totalSpend, totalBudget, avgRoas, budgetUsed };
   }, [affectedCampaigns]);
-
-  // Handle Open in Dashboard
-  const handleOpenInDashboard = () => {
-    if (alert) {
-      openAlertDetailView(alert);
-    }
-  };
 
   if (!alert) return null;
 
@@ -193,14 +186,6 @@ export const AudienceFatigueDetailPanel: React.FC<AudienceFatigueDetailPanelProp
                 <span className="relative z-10">{showRecommendations ? 'Back' : 'AI Recommendations'}</span>
               </motion.button>
 
-              {/* View in Dashboard Button - Solid Blue CTA */}
-              <button
-                onClick={handleOpenInDashboard}
-                className="flex-1 h-8 px-4 rounded-xl font-semibold text-[11px] transition-all duration-200 flex items-center justify-center gap-2 border border-white/15 bg-white/5 hover:bg-white/10 text-white"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                Open in Dashboard
-              </button>
             </div>
 
             {/* CSS Keyframes for animations */}
@@ -549,17 +534,16 @@ export const AudienceFatigueDetailPanel: React.FC<AudienceFatigueDetailPanelProp
                         </span>
                         <button
                           className="p-1.5 rounded-md border border-white/15 bg-transparent hover:bg-white/10 transition-colors"
-                          title="Open in Dashboard"
+                          title="Focus"
                           onClick={(e) => {
                             e.stopPropagation();
                             try {
                               setFocusedCampaign(campaign.id);
                               setZoomLevel(90);
-                              setActiveView('dashboard');
                             } catch {}
                           }}
                         >
-                          <LayoutDashboard className="w-4 h-4 text-white" />
+                          <Target className="w-4 h-4 text-white" />
                         </button>
                       </div>
                       </div>

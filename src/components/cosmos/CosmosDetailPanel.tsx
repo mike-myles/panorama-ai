@@ -1,11 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, TrendingUp, TrendingDown, AlertTriangle, DollarSign, Activity, Flag, Send, Users, Clock, Share2, Sparkles, Target, ArrowRight, LayoutDashboard } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, AlertTriangle, DollarSign, Activity, Flag, Send, Users, Clock, Share2, Sparkles, Target, ArrowRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { Campaign, CategorizedAlert, AlertCategory } from '../../types';
 import { useDashboard } from '../../context/DashboardContext';
 import { calculateCategorizedAlerts } from '../../utils/alertCalculations';
-import { AI_SOLUTIONS } from '../dashboard/AlertDetailDashboard';
+import { AI_SOLUTIONS } from '../../data/aiSolutions';
 
 /* cspell:words ROAS roas bg FC sev */
 
@@ -20,7 +20,7 @@ interface CosmosDetailPanelProps {
 }
 
 export const CosmosDetailPanel = ({ isOpen, campaign, onClose, selectedChild, campaignGroup, selectedAlert, selectedCampaignId }: CosmosDetailPanelProps) => {
-  const { setFocusedCampaign, setZoomLevel, setActiveView, openAlertDetailView } = useDashboard();
+  const { setFocusedCampaign, setZoomLevel } = useDashboard();
   const [isFlagDialogOpen, setIsFlagDialogOpen] = useState(false);
   const [flagMessage, setFlagMessage] = useState('');
   const [showFlagToast, setShowFlagToast] = useState(false);
@@ -148,14 +148,6 @@ Campaign Management System`;
             paused: { bg: 'bg-red-500', text: 'text-red-300', dot: '#EF4444' }
           } as const;
   const statusColor = statusColors[(campaign?.status as keyof typeof statusColors) || 'paused'] || statusColors.paused;
-
-  const handleShowInDashboard = () => {
-    // Order matters; do NOT call onClose here to avoid clearing focusedCampaignId via CosmosView timeout
-    if (!campaign) return;
-    setFocusedCampaign(campaign.id);
-    setZoomLevel(90); // Diagnostic layer range (Layer 3)
-    setActiveView('dashboard');
-  };
 
   const formatDate = (d: Date | string | null | undefined) => {
     if (!d) return '—';
@@ -345,12 +337,6 @@ Campaign Management System`;
                         <Sparkles className="w-4 h-4 mr-1.5 text-purple-400" />
                         {showRecommendations ? 'Back' : 'Recommendations'}
                       </button>
-                      <button
-                        onClick={() => { if (selectedAlert) { try { openAlertDetailView(selectedAlert); } catch {} } }}
-                        className="w-full px-2.5 py-1 bg-primary hover:bg-primary/80 text-white text-xs font-semibold rounded-md border border-white/15 transition-colors text-center"
-                      >
-                        Open in Dashboard
-                      </button>
                     </div>
                   </div>
                 ) : (campaign ? (
@@ -372,17 +358,6 @@ Campaign Management System`;
                     </button>
                   </div>
                 ) : null)}
-                {!groupMode && campaign && (
-                  <div className="flex items-center justify-end">
-                    <button
-                      onClick={handleShowInDashboard}
-                      className="h-8 px-4 rounded-xl font-semibold text-[11px] transition-all duration-200 flex items-center gap-2 border border-white/15 bg-white/5 hover:bg-white/10 text-white"
-                    >
-                      <LayoutDashboard className="w-4 h-4" />
-                      Open in Dashboard
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Content - Scrollable - Matches Filter Panel Layout */}
@@ -549,11 +524,10 @@ Campaign Management System`;
                                     try {
                                       setFocusedCampaign(c.id);
                                       setZoomLevel(90);
-                                      setActiveView('dashboard');
                                     } catch {}
                                   }}
                                 >
-                                  Open in Dashboard
+                                  Focus
                                 </button>
                               </div>
                             </div>
@@ -903,20 +877,6 @@ Campaign Management System`;
                     </span>
                   </div>
                 </div>
-              </div>
-
-              {/* Action Buttons - Matches Filter Panel Style */}
-              <div className="space-y-2 pt-2">
-                <button
-                  className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 border border-blue-500 text-white rounded-lg font-semibold transition-colors"
-                >
-                  View Full Details
-                </button>
-                <button
-                  className="w-full px-4 py-3 bg-transparent hover:bg-white/5 border border-white/15 text-white rounded-lg font-semibold transition-colors"
-                >
-                  Edit Campaign
-                </button>
               </div>
                   </>
                 ) : null)}

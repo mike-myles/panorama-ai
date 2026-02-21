@@ -10,23 +10,19 @@ import { useDashboard } from '../context/DashboardContext';
 import { PerformanceSun } from './cosmos/PerformanceSun';
 import { OrbitalRingSystem } from './cosmos/OrbitalRingSystem';
 import { CampaignNodes } from './cosmos/CampaignNodes';
-import { CosmosFloatingControls } from './cosmos/CosmosFloatingControls';
 import { CosmosFilterPanel } from './cosmos/CosmosFilterPanel';
 import { CosmosAlertsPanel } from './cosmos/CosmosAlertsPanel';
 import { CosmosLaunchPanel } from './cosmos/CosmosLaunchPanel';
-import { HelpModal } from './HelpModal';
 import { CosmosDetailPanel } from './cosmos/CosmosDetailPanel';
 import { AudienceFatigueDetailPanel } from './cosmos/panels/AudienceFatigueDetailPanel';
 import { CampaignOrbitView } from './cosmos/CampaignOrbitView';
-import { CommandBar } from './CommandBar';
-import { ZoomControls } from './ZoomControls';
 import { Campaign, FunnelStage, LifecycleStage } from '../types';
 import { CosmosLegend } from './cosmos/CosmosLegend';
 import { CampaignOrbitLegend } from './cosmos/CampaignOrbitLegend';
 import { CosmosBackground } from './cosmos/CosmosBackground';
 
 export const CosmosView = () => {
-  const { zoomState, data, setZoomLevel, activeView, setFocusedCampaign, showZoomInDashboard, setShowZoomInDashboard } = useDashboard();
+  const { zoomState, data, dataSource, setZoomLevel, setFocusedCampaign } = useDashboard();
   const containerRef = useRef<HTMLDivElement>(null);
   // const [showZoomHint, setShowZoomHint] = React.useState(false); // hint disabled
   const [showCampaignNames, setShowCampaignNames] = React.useState(false); // Toggle for campaign names
@@ -35,11 +31,7 @@ export const CosmosView = () => {
   const [isAlertsPanelOpen, setIsAlertsPanelOpen] = React.useState(false); // Alerts panel state
   const [isLaunchPanelOpen, setIsLaunchPanelOpen] = React.useState(false); // Launch readiness panel state
   const [alertFilterCampaignIds, setAlertFilterCampaignIds] = React.useState<string[] | null>(null); // Alert filter for campaign IDs
-  const [isHelpModalOpen, setIsHelpModalOpen] = React.useState(false); // Help modal state
-  const [isCommandBarOpen, setIsCommandBarOpen] = React.useState(false);
-  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
-  const isCosmosActive = activeView === 'cosmos';
 
   // Camera defaults and editing controls
   // Default camera tuned to fit all orbits while preserving original rotation.
@@ -63,6 +55,28 @@ export const CosmosView = () => {
     over80: true
   });
 
+  // GMO view: 6 orbit labels from end-date segments (innermost = soonest → outermost = latest)
+  const gmoOrbitLabels = React.useMemo(() => {
+    if (dataSource !== 'gmo' || !data.campaigns.length) return [];
+    const withEnd = data.campaigns.filter(
+      (c) => c.endDate && ((c as any).startDate || c.createdDate)
+    );
+    if (withEnd.length === 0) return [];
+    const endTimes = withEnd.map((c) => new Date(c.endDate!).getTime());
+    const minT = Math.min(...endTimes);
+    const maxT = Math.max(...endTimes);
+    const span = (maxT - minT) / 6 || 1;
+    const format = (t: number) => {
+      const d = new Date(t);
+      return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric', day: 'numeric' });
+    };
+    return [0, 1, 2, 3, 4, 5].map((i) => {
+      const segmentStart = minT + i * span;
+      const segmentEnd = minT + (i + 1) * span;
+      return `${format(segmentStart)} – ${format(segmentEnd)}`;
+    });
+  }, [dataSource, data.campaigns]);
+
   // Campaign Orbit view state
   const [showCampaignOrbit, setShowCampaignOrbit] = React.useState(false);
   const [orbitFade, setOrbitFade] = React.useState(0);
@@ -71,21 +85,6 @@ export const CosmosView = () => {
   const [selectedChild, setSelectedChild] = React.useState<any | null>(null);
   const [alertGroupCampaigns, setAlertGroupCampaigns] = React.useState<Campaign[] | null>(null);
   const [selectedAlertInfo, setSelectedAlertInfo] = React.useState<import('../types').CategorizedAlert | null>(null);
-
-  // Inline toggle component for Dashboard zoom visibility
-  const ToggleDashboardZoomSetting = () => (
-    <label className="inline-flex items-center cursor-pointer select-none">
-      <input
-        type="checkbox"
-        className="sr-only peer"
-        checked={showZoomInDashboard}
-        onChange={e => setShowZoomInDashboard(e.target.checked)}
-      />
-      <div className="w-11 h-6 bg-white/20 rounded-full peer peer-checked:bg-primary transition-colors relative">
-        <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5" />
-      </div>
-    </label>
-  );
 
   // Detail Panel State
   const [detailPanelState, setDetailPanelState] = React.useState<{
@@ -192,7 +191,7 @@ export const CosmosView = () => {
     rafId = requestAnimationFrame(animate);
   }, [setZoomLevel, setFocusedCampaign, initialCameraPosition, initialTarget, zoomState.level, alertGroupCampaigns]);
 
-  // Listen for global reset requests (from ZoomControls chevrons-up)
+  // Listen for global reset requests (e.g. header View refresh)
   useEffect(() => {
     const handler = () => resetView();
     window.addEventListener('cosmosResetView', handler as EventListener);
@@ -287,7 +286,7 @@ export const CosmosView = () => {
 
   // Sync selection when switching between views or when AI Navigator focuses a campaign
   useEffect(() => {
-    if (activeView !== 'cosmos') return;
+    return;
     const focusedId = zoomState.focusedCampaignId as string | undefined;
     if (focusedId) {
       // Skip if we're already focused on this campaign to prevent animation conflicts
@@ -314,7 +313,7 @@ export const CosmosView = () => {
       setDetailPanelState({ isOpen: false, campaign: null, isAnimating: false });
       setSelectedTargetPos(null);
     }
-  }, [activeView, zoomState.focusedCampaignId, data.campaigns, getCampaignPosition]);
+  }, [zoomState.focusedCampaignId, data.campaigns, getCampaignPosition]);
 
   // Listen for AI Navigator mode toggles
   useEffect(() => {
@@ -884,8 +883,6 @@ export const CosmosView = () => {
     const lastDisplayUpdate = useRef(0);
     
     useFrame(() => {
-      if (!isCosmosActive) return;
-      
       // Ensure controls are enabled for interaction, but do NOT override during animations or panel open
       if (
         orbitControlsRef.current &&
@@ -966,7 +963,6 @@ export const CosmosView = () => {
   const CameraApplyController = ({ tick, pos, tgt }: { tick: number; pos: [number, number, number]; tgt: [number, number, number]; }) => {
     const { camera } = useThree();
     useEffect(() => {
-      if (!isCosmosActive) return;
       if (detailPanelState.isOpen || isAnimatingCamera.current) return;
       // Apply camera position
       camera.position.set(pos[0], pos[1], pos[2]);
@@ -1072,14 +1068,7 @@ export const CosmosView = () => {
     low: true
   });
 
-  // Ensure only one left-side panel is open at a time (single-select behavior)
-  const openExclusivePanel = React.useCallback((panel: 'ai' | 'search' | 'alerts' | 'launch' | 'none') => {
-    setIsCommandBarOpen(panel === 'ai');
-    setIsSearchOpen(panel === 'search');
-    setIsAlertsPanelOpen(panel === 'alerts');
-    setIsLaunchPanelOpen(panel === 'launch');
-    setLaunchOnly(panel === 'launch');
-  }, []);
+  // Left-side floating controls removed; panels remain for any future triggers
 
   const handleToggleChannel = (id: string) => {
     setVisibleChannels(prev => ({ ...prev, [id]: !(prev[id] !== false) }));
@@ -1101,6 +1090,42 @@ export const CosmosView = () => {
     setVisibleReadinessStatuses(prev => ({ ...prev, [status]: !prev[status] }));
   };
 
+  // Apply AI intent from header prompt (cosmos:applyLegendFilters)
+  useEffect(() => {
+    const handler = (e: CustomEvent<{
+      visibleChannels?: Record<string, boolean>;
+      visibleStatuses?: Record<'active' | 'at_risk' | 'paused', boolean>;
+      visibleReadinessStatuses?: Record<'on_track' | 'needs_attention' | 'at_risk', boolean>;
+      alertsOnly?: boolean;
+      launchOnly?: boolean;
+      visibleTiers?: Record<'flat' | 'thirty' | 'sixty' | 'ninety', boolean>;
+      visibleLifecycleStages?: Record<LifecycleStage, boolean>;
+      visibleFunnelStages?: Record<FunnelStage, boolean>;
+      visibleSpendSizes?: Record<'high' | 'mid' | 'low', boolean>;
+    }>) => {
+      const d = e.detail || {};
+      if (d.visibleChannels !== undefined) setVisibleChannels(d.visibleChannels);
+      if (d.visibleStatuses !== undefined) setVisibleStatuses(d.visibleStatuses);
+      if (d.visibleReadinessStatuses !== undefined) setVisibleReadinessStatuses(d.visibleReadinessStatuses);
+      if (d.alertsOnly !== undefined) setAlertsOnly(d.alertsOnly);
+      if (d.launchOnly !== undefined) setLaunchOnly(d.launchOnly);
+      if (d.visibleTiers !== undefined) setVisibleTiers(d.visibleTiers);
+      if (d.visibleLifecycleStages !== undefined) setVisibleLifecycleStages(d.visibleLifecycleStages);
+      if (d.visibleFunnelStages !== undefined) setVisibleFunnelStages(d.visibleFunnelStages);
+      if (d.visibleSpendSizes !== undefined) setVisibleSpendSizes(d.visibleSpendSizes);
+    };
+    window.addEventListener('cosmos:applyLegendFilters', handler as EventListener);
+    return () => window.removeEventListener('cosmos:applyLegendFilters', handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ query?: string }>) => {
+      setSearchQuery(e.detail?.query ?? '');
+    };
+    window.addEventListener('cosmos:setSearchQuery', handler as EventListener);
+    return () => window.removeEventListener('cosmos:setSearchQuery', handler as EventListener);
+  }, []);
+
   return (
     <div 
       ref={containerRef}
@@ -1110,7 +1135,7 @@ export const CosmosView = () => {
       {/* Top-centered title overlay - floating text */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none select-none">
         <div className="text-sm font-semibold text-white/90">
-          {showCampaignOrbit ? 'Campaign orbit' : (launchReadinessMode ? 'Launch readiness' : 'Portfolio overview')}
+          {showCampaignOrbit ? 'Campaign orbit' : dataSource === 'gmo' ? 'GMO view' : (launchReadinessMode ? 'Launch readiness' : 'Cosmos view')}
         </div>
       </div>
 
@@ -1192,8 +1217,9 @@ export const CosmosView = () => {
           visibleTiers={visibleTiers}
           visibleLifecycleStages={visibleLifecycleStages}
           visibleFunnelStages={visibleFunnelStages}
-          layoutMode={launchReadinessMode ? 'launch_readiness' : 'default'}
+          layoutMode={dataSource === 'gmo' ? 'gmo' : launchReadinessMode ? 'launch_readiness' : 'default'}
           visibleBands={visibleBands}
+          gmoOrbitLabels={gmoOrbitLabels}
         />
         
         {/* Campaign Nodes - NEW FRAMEWORK: Lifecycle rings + Funnel planes + Readiness colors */}
@@ -1226,7 +1252,7 @@ export const CosmosView = () => {
           visibleFunnelStages={visibleFunnelStages}
           visibleReadinessStatuses={visibleReadinessStatuses}
           visibleSpendSizes={visibleSpendSizes}
-          layoutMode={launchReadinessMode ? 'launch_readiness' : 'default'}
+          layoutMode={dataSource === 'gmo' ? 'gmo' : launchReadinessMode ? 'launch_readiness' : 'default'}
           alertFilterCampaignIds={alertFilterCampaignIds}
         />
         
@@ -1469,28 +1495,9 @@ export const CosmosView = () => {
         </div>
       )}
 
-      {/* Floating Controls (Top Left) */}
-      <CosmosFloatingControls
-        onFilterClick={() => setIsFilterPanelOpen(true)}
-        onAlertsClick={() => openExclusivePanel(isAlertsPanelOpen ? 'none' : 'alerts')}
-        alertsActive={isAlertsPanelOpen}
-        onHelpClick={() => setIsHelpModalOpen(true)}
-        onSearchClick={() => openExclusivePanel(isSearchOpen ? 'none' : 'search')}
-        searchOpen={isSearchOpen}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onSearchClose={() => openExclusivePanel('none')}
-        onAINavigatorClick={() => openExclusivePanel(isCommandBarOpen ? 'none' : 'ai')}
-        onLaunchClick={() => openExclusivePanel(isLaunchPanelOpen ? 'none' : 'launch')}
-        launchActive={isLaunchPanelOpen}
-        onResetView={resetView}
-        hideReset
-        hideToggleNames
-        showCampaignNames={showCampaignNames}
-        onToggleCampaignNames={() => setShowCampaignNames(!showCampaignNames)}
-      />
-      
-      {/* Filter Panel (Slides in from left) */}
+      {/* Left-side floating controls removed; Search and View refresh are in header */}
+
+      {/* Filter Panel (Slides in from left) - open via other triggers if needed */}
       <CosmosFilterPanel
         isOpen={isFilterPanelOpen}
         onClose={() => setIsFilterPanelOpen(false)}
@@ -1499,34 +1506,22 @@ export const CosmosView = () => {
       <CosmosAlertsPanel
         isOpen={isAlertsPanelOpen}
         onClose={() => {
-          openExclusivePanel('none');
-          setAlertFilterCampaignIds(null); // Clear filter when closing
-            setSelectedAlertInfo(null);
+          setIsAlertsPanelOpen(false);
+          setAlertFilterCampaignIds(null);
+          setSelectedAlertInfo(null);
         }}
-        searchOpen={isSearchOpen}
-          onFilterCampaigns={setAlertFilterCampaignIds}
-          onSelectAlert={(alert) => setSelectedAlertInfo(alert)}
+        searchOpen={false}
+        onFilterCampaigns={setAlertFilterCampaignIds}
+        onSelectAlert={(alert) => setSelectedAlertInfo(alert)}
       />
 
       {/* Launch Readiness Panel */}
       <CosmosLaunchPanel
         isOpen={isLaunchPanelOpen}
-        onClose={() => { openExclusivePanel('none'); }}
-        searchOpen={isSearchOpen}
+        onClose={() => setIsLaunchPanelOpen(false)}
+        searchOpen={false}
       />
-      
-      {/* Help Modal */}
-      <HelpModal
-        isOpen={isHelpModalOpen}
-        onClose={() => setIsHelpModalOpen(false)}
-      />
-      {/* Search input now rendered next to the floating search button */}
-      {/* AI Navigator Command Bar */}
-      <CommandBar
-        isOpen={isCommandBarOpen}
-        onClose={() => openExclusivePanel('none')}
-        searchOpen={isSearchOpen}
-      />
+
       {/* Settings Modal */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -1553,14 +1548,6 @@ export const CosmosView = () => {
                   <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5" />
                 </div>
               </label>
-            </div>
-            {/* Dashboard Zoom Controls Visibility */}
-            <div className="flex items-center justify-between py-3">
-              <div>
-                <div className="font-semibold">Show Zoom Controls in Dashboard</div>
-                <div className="text-xs text-gray-300">Affects non-3D Dashboard pages only</div>
-              </div>
-              <ToggleDashboardZoomSetting />
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button
@@ -1695,12 +1682,12 @@ export const CosmosView = () => {
             onToggleReadinessStatus={handleToggleReadinessStatus}
             visibleSpendSizes={visibleSpendSizes}
             onToggleSpendSize={(size) => setVisibleSpendSizes(prev => ({ ...prev, [size]: !prev[size] }))}
+            dataSource={dataSource}
+            gmoOrbitLabels={gmoOrbitLabels}
+            gmoCampaignCount={data.campaigns.length}
           />
         )}
       </div>
-
-      {/* Zoom Controls with Camera Position Logger Button */}
-      <ZoomControls />
 
       {/* HTML overlay for 3D Html labels - ensure this sits above all UI layers */}
       <div id="cosmos-html-layer" className="absolute inset-0 z-[10000] pointer-events-none" />

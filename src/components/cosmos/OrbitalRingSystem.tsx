@@ -26,6 +26,9 @@ const FUNNEL_PLANES: Array<{ stage: FunnelStage; label: string; tilt: number }> 
   { stage: 'retention', label: 'Retention (Post-funnel)', tilt: 90 }
 ];
 
+// GMO: 6 orbits by end date (same radii as CampaignNodes GMO layout)
+const GMO_ORBIT_RADII = [62, 80, 98, 116, 134, 152];
+
 interface OrbitalRingSystemProps {
   channels: Channel[];
   campaigns: Campaign[];
@@ -34,8 +37,10 @@ interface OrbitalRingSystemProps {
   visibleTiers?: Record<'flat' | 'thirty' | 'sixty' | 'ninety', boolean>;
   visibleLifecycleStages?: Record<LifecycleStage, boolean>;
   visibleFunnelStages?: Record<FunnelStage, boolean>;
-  layoutMode?: 'default' | 'launch_readiness';
+  layoutMode?: 'default' | 'launch_readiness' | 'gmo';
   visibleBands?: Record<'under20' | '20to40' | '40to60' | '60to80' | 'over80', boolean>;
+  /** When layoutMode === 'gmo', 6 labels for orbits (innermost = soonest end date → outermost = latest) */
+  gmoOrbitLabels?: string[];
 }
 
 /* cspell:words Mul MOFU BOFU TOFU UX */
@@ -306,9 +311,37 @@ export const OrbitalRingSystem = ({
   visibleLifecycleStages,
   visibleFunnelStages,
   layoutMode = 'default', 
-  visibleBands 
+  visibleBands,
+  gmoOrbitLabels = []
 }: OrbitalRingSystemProps) => {
   const currentLayer = Math.floor(zoomLevel / 20);
+  
+  if (layoutMode === 'gmo') {
+    const labels = gmoOrbitLabels.length >= 6 ? gmoOrbitLabels : [
+      'End: Soonest', 'End: +20%', 'End: +40%', 'End: +60%', 'End: +80%', 'End: Latest'
+    ];
+    const opacity = 1.0;
+    const flatMul = 1.0;
+    return (
+      <group>
+        {GMO_ORBIT_RADII.map((radius, i) => (
+          <OrbitalRing
+            key={`gmo-${i}`}
+            radius={radius}
+            color="#6B7280"
+            label={labels[i] ?? `Orbit ${i + 1}`}
+            opacity={opacity}
+            zoomLevel={zoomLevel}
+            retentionMul={0}
+            conversionMul={0}
+            considerationMul={0}
+            awarenessMul={flatMul}
+            lifecycleMul={1.0}
+          />
+        ))}
+      </group>
+    );
+  }
   
   if (layoutMode === 'launch_readiness') {
     // Build percent-complete bands: >80%, 60–80%, 40–60%, 20–40%, <20%

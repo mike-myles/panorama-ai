@@ -1,5 +1,6 @@
 /* cspell:words bg ROAS */
 import { useDashboard } from '../../context/DashboardContext';
+import type { DataSource } from '../../context/DashboardContext';
 import { FunnelStage, LifecycleStage } from '../../types';
 
 // Campaign Health Status (planet colors)
@@ -57,6 +58,10 @@ interface CosmosLegendProps {
   // Campaign names toggle
   showCampaignNames?: boolean;
   onToggleCampaignNames?: () => void;
+  // GMO data source: show end-date orbits + duration size legend
+  dataSource?: DataSource;
+  gmoOrbitLabels?: string[];
+  gmoCampaignCount?: number;
 }
 
 // Reusable filter button with hover state
@@ -97,12 +102,63 @@ export const CosmosLegend = ({
   visibleBands,
   onToggleBand,
   showCampaignNames: _showCampaignNames,
-  onToggleCampaignNames: _onToggleCampaignNames
+  onToggleCampaignNames: _onToggleCampaignNames,
+  dataSource = 'mock',
+  gmoOrbitLabels = [],
+  gmoCampaignCount = 0
 }: CosmosLegendProps) => {
   const { data: _data } = useDashboard();
   const mode = (() => {
     try { return (typeof window !== 'undefined' && (window as any).catalyzeCosmosMode) || 'default'; } catch { return 'default'; }
   })();
+
+  if (dataSource === 'gmo') {
+    return (
+      <div className="flex flex-col text-white w-[220px] pointer-events-auto select-none max-h-[85vh] overflow-y-auto gap-2">
+        <div className="bg-black/75 backdrop-blur-md border border-white/15 rounded-xl shadow-2xl">
+          <div className="px-4 pt-3.5 pb-3">
+            <div className="text-[12px] font-semibold text-white/70 tracking-[0.15em] uppercase mb-3.5">
+              GMO Campaigns
+            </div>
+            <div className="text-[11px] text-gray-400 mb-1">
+              Under development only
+            </div>
+            <div className="text-[12px] font-semibold text-white/90 mb-3">
+              Campaigns: {gmoCampaignCount}
+            </div>
+            <div className="mb-4">
+              <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-2">
+                Size: Campaign duration
+              </div>
+              <p className="text-xs text-gray-300">
+                Start → end date. Small = short window; large = up to 4× longer.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-black/75 backdrop-blur-md border border-white/15 rounded-xl shadow-2xl">
+          <div className="px-4 pt-3.5 pb-3">
+            <div className="text-[12px] font-semibold text-white/70 tracking-[0.15em] uppercase mb-3.5">
+              Orbits: End date
+            </div>
+            <p className="text-[11px] text-gray-400 mb-3">
+              Innermost = soonest end date; outermost = latest.
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {(gmoOrbitLabels.length >= 6 ? gmoOrbitLabels : [
+                'Soonest', '+20%', '+40%', '+60%', '+80%', 'Latest'
+              ]).map((label, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs text-gray-300">
+                  <span className="inline-block w-4 h-0.5 rounded-sm flex-shrink-0 bg-gray-500" />
+                  <span className="truncate">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col text-white w-[220px] pointer-events-auto select-none max-h-[85vh] overflow-y-auto gap-2">
